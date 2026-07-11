@@ -1009,6 +1009,13 @@ scene.add(fillLight);
         }
 
         // Game variables
+        // ===== 引擎声音相关 =====
+var audioCtx = null;
+var oscillator = null;
+var gainNode = null;
+var engineSoundStarted = false;
+var targetGain = 0;
+var currentGain = 0;
         
         var speed = 0;
         var vehicle = null;
@@ -1576,6 +1583,21 @@ scene.add(fillLight);
                 }
             }
             if (vehicle && !crashed && !isPaused) {
+            // 引擎声音随速度变化
+if (engineSoundStarted && audioCtx && oscillator && gainNode) {
+    // 速度映射：0~0.3 对应 80~200Hz，速度越快频率越高
+    var minFreq = 80;
+    var maxFreq = 350;
+    var freq = minFreq + (speed / 0.3) * (maxFreq - minFreq);
+    freq = Math.min(maxFreq, Math.max(minFreq, freq));
+    oscillator.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.1);
+
+    // 音量：速度 0 时 0，速度 0.3 时达到最大（0.03 较小）
+    targetGain = Math.min(0.03, speed / 0.3 * 0.03);
+    // 平滑音量变化，避免突变
+    currentGain += (targetGain - currentGain) * 0.05;
+    gainNode.gain.setTargetAtTime(currentGain, audioCtx.currentTime, 0.05);
+}
                 // Input handling (continuous)
 
                 // Left/right turning controls
@@ -1820,6 +1842,7 @@ if (compassNeedle) {
             isPaused = !isPaused;
 
             if (isPaused) {
+            if (gainNode) gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
                 escMenu.style.opacity = '1';
                 escMenu.style.pointerEvents = 'auto';
                 var glass = escMenu.querySelector('.glass-effect');
@@ -1933,6 +1956,11 @@ if (compassNeedle) {
                 scene.remove(vehicle);
                 vehicle = null;
             }
+            if (oscillator && audioCtx) {
+        try { oscillator.stop(); } catch(e) {}
+        audioCtx.close();
+        engineSoundStarted = false;
+    }
         }
 
         // Switch camera view
@@ -1981,7 +2009,27 @@ if (compassNeedle) {
             var glass = controlsModal.querySelector('.glass-effect');
             if (glass) glass.style.transform = 'scale(0.95)';
         }
+function initEngineSound() {
+    try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        oscillator = audioCtx.createOscillator();
+        gainNode = audioCtx.createGain();
 
+        oscillator.type = 'sawtooth'; // 可改为 'square' 或 'triangle'
+        oscillator.frequency.value = 80; // 基础频率（怠速）
+        gainNode.gain.value = 0.0; // 初始静音
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.start();
+        engineSoundStarted = true;
+
+        // 由于声音持续播放，不需要停止
+    } catch (e) {
+        console.warn('引擎声音初始化失败（可能被浏览器阻止）:', e);
+    }
+}
         // Start game with selected settings
         function startGameWithSettings(vehicleType, startPosition) {
             // Hide the menu
@@ -2017,7 +2065,9 @@ if (compassNeedle) {
             }
             
             scene.add(vehicle);
-            
+            if (!engineSoundStarted) {
+    initEngineSound();
+}
             // Reset movement/visual angles
             headingAngle = 0;
             pitchAngle = 0;
