@@ -1016,6 +1016,8 @@ var gainNode = null;
 var engineSoundStarted = false;
 var targetGain = 0;
 var currentGain = 0;
+var lastLockWarningTime = 0;
+var lockWarningInterval = 1500; // 毫秒
         
         var speed = 0;
         var vehicle = null;
@@ -1072,6 +1074,80 @@ var currentGain = 0;
             {x: -30, y: 7, z: 30},
             {x: 40, y: 10, z: 40}
         ];
+        // ===== 武器音效合成函数 =====
+
+// 1. 导弹发射音效（嗖的一声，短促上升）
+function playMissileLaunch() {
+    if (!audioCtx) return;
+    try {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+    } catch(e) { /* 静默忽略 */ }
+}
+
+// 2. 爆炸音效（短促白噪声 + 低频冲击）
+function playExplosion() {
+    if (!audioCtx) return;
+    try {
+        var bufferSize = audioCtx.sampleRate * 0.3; // 0.3秒
+        var buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        var data = buffer.getChannelData(0);
+        for (var i = 0; i < bufferSize; i++) {
+            var env = Math.exp(-i / (bufferSize * 0.2));
+            data[i] = (Math.random() * 2 - 1) * env * 0.3; // 白噪声
+        }
+        var noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        var gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.025, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        noise.connect(gain);
+        gain.connect(audioCtx.destination);
+        noise.start();
+        // 加一个低频噗声
+        var osc = audioCtx.createOscillator();
+        var g2 = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.2);
+        g2.gain.setValueAtTime(0.02, audioCtx.currentTime);
+        g2.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+        osc.connect(g2);
+        g2.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+    } catch(e) { /* 静默忽略 */ }
+}
+
+// 3. 锁定提示音（两短促哔哔声，间隔0.3秒）
+function playLockWarning() {
+    if (!audioCtx) return;
+    try {
+        var beep = function(delay) {
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.01, audioCtx.currentTime + delay);
+            gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.08);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + delay);
+            osc.stop(audioCtx.currentTime + delay + 0.08);
+        };
+        beep(0);
+        beep(0.25);
+    } catch(e) { /* 静默忽略 */ }
+}
 		        // ========== AI FUNCTIONS ==========
         
         // Create AI airplane with lives tracking
@@ -1475,6 +1551,7 @@ var currentGain = 0;
                     var exp = new THREE.Mesh(expGeo, expMat);
                     exp.position.copy(m.mesh.position);
                     scene.add(exp);
+                    playExplosion();
                     setTimeout(() => scene.remove(exp), 200);
                     
                     scene.remove(m.mesh);
@@ -1519,6 +1596,12 @@ var currentGain = 0;
                     threatWarningEl.classList.add('hidden');
                 }
             }
+            // 锁定提示音（节流）
+var now = Date.now();
+if (threatDetected && (now - lastLockWarningTime > lockWarningInterval)) {
+    playLockWarning();
+    lastLockWarningTime = now;
+}
         }
         
         // ========== AI FUNCTIONS END ==========
@@ -1783,7 +1866,7 @@ if (compassNeedle) {
             var explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
             explosion.position.copy(vehicle.position);
             scene.add(explosion);
-
+playExplosion();
             // Animate explosion
             if (typeof gsap !== 'undefined') {
                 gsap.to(explosion.scale, {
@@ -2174,6 +2257,7 @@ function initEngineSound() {
             // Handle spacebar for missile
             if (event.code === 'Space' && multiplayerEnabled && !crashed && !isPaused) {
                 event.preventDefault();
+                playMissileLaunch(); // 发射音效
                 var now = Date.now();
                 if (now - lastMissileTime > missileCooldown) {
                     lastMissileTime = now;
