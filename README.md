@@ -21,7 +21,7 @@
 ***
 ## Updates:
 
-2.1V : Upadated shader. Added a new function of AI Battle.
+2.1V : Upadated shader. Added AI Battle.
 
 2.0V : A major update. Beautify the UI. Modify moving and steering mechanism. Add shader. Add more HUD. Totally changed the gaming experience.
 
