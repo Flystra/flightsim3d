@@ -1,4 +1,5 @@
 # A Online 3D Flight Simulator made by 飞的智动。
+![项目图标](./logo.jpg)
 ***
 ## Play On https://flystra.github.io/flightsim3d/
 ***
