@@ -563,6 +563,18 @@
     <!-- Three.js Script -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
+     function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
+
+    function setCookie(name, value, days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = `${name}=${value};expires=${date.toUTCString()};path=/`;
+    }
         // Scene setup
         var scene = new THREE.Scene();
         var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -2187,7 +2199,17 @@ if (compassNeedle) {
         document.addEventListener('DOMContentLoaded', () => {
             // 获取新添加的警告元素
             const proximityWarningEl = document.getElementById('proximityWarning');
-            
+            // ---- ★ 核心：Cookie 首次访问检测 ★ ----
+        // 如果用户第一次打开页面，自动弹出 Controls 界面
+        if (!getCookie('flightsim3d_visited')) {
+            // 延迟一点点，让页面渲染完成，动画更流畅
+            setTimeout(function() {
+                showControlsModal();
+            }, 600);
+            // 设置 Cookie，有效期 365 天
+            setCookie('flightsim3d_visited', 'true', 365);
+        }
+        // 如果不是第一次访问，什么也不做，Controls 保持隐藏
             // Multiplayer toggle functionality
             const multiplayerToggle = document.getElementById('multiplayerToggle');
             const nicknameContainer = document.getElementById('nicknameContainer');
