@@ -20,6 +20,7 @@
 14. J Fire Flare (2.5s cooldown)
 ***
 ## Updates:
+2.2V : Added sound. Added Auto pop-up.
 
 2.1V : Upadated shader. Added AI Battle.
 
